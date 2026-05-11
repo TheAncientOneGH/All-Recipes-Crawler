@@ -1,0 +1,9 @@
+{
+  "ignore_links": [
+    "/authentication/",
+    "/video",
+    "about-us-",
+    "/recalls/",
+    "/trends/"
+  ]
+}
