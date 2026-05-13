@@ -3,14 +3,14 @@
 AllRecipes Viewer
 A lightweight Python web app to display AllRecipes collected recipes.
 Serves a single-page HTML/JS frontend with live updates and search.
-Version: 1.0
+Version: 1.1
 Author: Doug - TheAncientOne (TheAncientOneGH)
 Github: https://github.com/TheAncientOneGH/All-Recipes-Crawler
 Donate: https://www.paypal.com/donate/?hosted_button_id=JJ2KF3GDK9C38
 """
 
 appname = "AllRecipes Crawler"
-verstr = "1.0"
+verstr = "1.1"
 domhref = "https://www."
 domain = "allrecipes.com"
 
@@ -24,9 +24,9 @@ import urllib.parse
 from pathlib import Path
 import threading
 import sqlite3
-import logging
+#import logging
 
-logging.basicConfig(filename="error.log", level=logging.DEBUG, format="%(message)s")
+#logging.basicConfig(filename="error.log", level=logging.DEBUG, format="%(message)s")
 # Configuration
 # Current directory (contains 'output' subfolder)
 DATA_DIR = Path(".")
@@ -57,18 +57,21 @@ def get_db_connection():
         _db_connection.row_factory = sqlite3.Row
     return _db_connection
 
-def stripClean(text):
-    cleaned = text.replace(" ", "_")
-    cleaned = cleaned.replace("____", "_")
-    cleaned = cleaned.replace("___", "_")
-    cleaned = cleaned.replace("__", "_")
+def stripClean(text: str) -> str:
+    if not text:
+        return ""
+
+    cleaned = re.sub(r'[^\x00-\x7F]+', '', text)
+
+    cleaned = re.sub(
+        r"\s*\(Video Recipe\)\s*|\s*VIDEO\s*", " ", cleaned, flags=re.IGNORECASE
+    )
+    cleaned = cleaned.replace(" ", "_")
+    cleaned = re.sub(r"_+", "_", cleaned)
     cleaned = cleaned.replace("%", "--PCENT--")
     cleaned = cleaned.replace("&", "--AND--")
-    cleaned = re.sub(r"[()]", "", cleaned)
-    cleaned = re.sub(r'[“”,!’\'"<>:/\\|?*]', "", cleaned)
-    cleaned = cleaned.strip("_\n")
-    cleaned = cleaned.strip("_")
-    cleaned = cleaned.strip()
+    cleaned = re.sub(r'[()“”’!\',"<>:/\\|?*\[\]]', "", cleaned)
+    cleaned = cleaned.strip("_ \n")
     return cleaned
 
 def load_all_recipes():
@@ -92,12 +95,10 @@ def load_all_recipes():
                 with open(json_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     # Ensure image_path is set for JSON fallback
-                    if data.get("image"):
-                        data["image_path"] = (
-                            f"output/images/{stripClean(data.get('name', ''))}.webp"
-                        )
-                    else:
-                        data["image_path"] = f"templates/noimage.jpg"
+                    #if data.get("image"):
+                    #    data["image_path"] = (f"output/images/{stripClean(data.get('name', ''))}.webp")
+                    #else:
+                    #    data["image_path"] = f"templates/noimage.jpg"
                     recipes.append(data)
             except Exception as e:
                 print(f"Error loading {json_file}: {e}")
@@ -122,15 +123,15 @@ def load_all_recipes():
                 recipe_data["name"] = name
 
                 # Add image_path relative to server
-                if recipe_data.get("image"):
-                    recipe_data["image_path"] = f"output/images/{stripClean(name)}.webp"
-                else:
-                    recipe_data["image_path"] = f"templates/noimage.jpg"
+                #if recipe_data.get("image"):
+                #    recipe_data["image_path"] = f"output/images/{stripClean(name)}.webp"
+                #else:
+                #    recipe_data["image_path"] = f"templates/noimage.jpg"
 
                 recipes.append(recipe_data)
             except Exception as e:
                 print(f"Error loading recipe row: {e}")
-                logging.debug(f"Row: {row}")
+                #logging.debug(f"Row: {row}")
 
     except Exception as e:
         print(f"Database error: {e}")

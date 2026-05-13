@@ -3,17 +3,17 @@
 AllRecipes Crawler
 A Selenium-based web crawler to collect and view recipe data from www.allrecipes.com
 Collects: recipe name, ingredients, instructions, category, and an image
-Version: 1.0
+Version: 1.1
 Author: Doug - TheAncientOne (TheAncientOneGH)
 Github: https://github.com/TheAncientOneGH/All-Recipes-Crawler
 Donate: https://www.paypal.com/donate/?hosted_button_id=JJ2KF3GDK9C38
 """
 appname = "AllRecipes Crawler"
-verstr = "1.0"
+verstr = "1.1"
 domhref = "https://"
 domain = "www.allrecipes.com"
 dbase = "allrec.db"
-uagent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
 import os
 import sys
 import subprocess
@@ -26,6 +26,7 @@ import signal
 import argparse
 import html
 import sqlite3
+import random
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
 from pathlib import Path
@@ -82,6 +83,560 @@ RESUME_DIR.mkdir(exist_ok=True)
 COLLECTED_DIR.mkdir(exist_ok=True)
 SKIP_DIR.mkdir(exist_ok=True)
 DEBUGEN = False
+
+# Global variable for temporary image URL storage
+_tempimage = None
+
+# =============================================================================
+# STEALTH ENGINE — Anti-detection module
+# =============================================================================
+class StealthEngine:
+    """
+    Comprehensive anti-detection engine that patches browser fingerprints
+    and simulates human behavioral patterns to evade bot detection systems.
+    Covers: CDP-level patches, JS runtime spoofing, behavioral randomness.
+    """
+
+    # Pre-generated pool of realistic user-agent strings (Chrome 120-130 range)
+    UAS_POOL = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.6533.49 Safari/537.36 Edg/127.0.0.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.55 Safari/537.36 Edg/126.0.0.0"
+    ]
+
+    # Realistic language preferences (weighted by global usage)
+    LANG_POOL = [
+        "en-US,en;q=0.9",
+        "en-GB,en;q=0.9",
+        "de-DE,de;q=0.9,en-US;q=0.7",
+        "fr-FR,fr;q=0.9,en-US;q=0.7",
+        "es-ES,es;q=0.9,en-US;q=0.7",
+        "pt-BR,pt;q=0.9,en-US;q=0.7",
+        "ja-JP,ja;q=0.9,en-US;q=0.7",
+        "zh-CN,zh;q=0.9,en-US;q=0.7",
+        "ko-KR,ko;q=0.9,en;q=0.7",
+        "it-IT,it;q=0.9,en-US;q=0.7",
+        "nl-NL,nl;q=0.9,en-US;q=0.7",
+        "ru-RU,ru;q=0.9,en-US;q=0.7",
+    ]
+
+    # Platform variations
+    PLATFORMS = [
+        "Win32", "Win64", "MacIntel", "Linux x86_64",
+    ]
+
+    # Hardware concurrency options
+    HW_CONCURRENCY = [4, 8, 12, 16]
+
+    # Device memory options (in GB, reported as integer)
+    DEVICE_MEMORY = [4, 8, 16, 32]
+
+    # Screen resolutions (common user configurations)
+    SCREEN_RESOLUTIONS = [
+        (1920, 1080), (1366, 768), (1536, 864), (1440, 900),
+        (2560, 1440), (1280, 720), (1600, 900), (1920, 1200),
+    ]
+
+    # Color depths
+    COLOR_DEPTHS = [24, 30, 16]
+
+    @staticmethod
+    def random_ua():
+        return random.choice(StealthEngine.UAS_POOL)
+
+    @staticmethod
+    def random_lang():
+        return random.choice(StealthEngine.LANG_POOL)
+
+    @staticmethod
+    def random_platform():
+        return random.choice(StealthEngine.PLATFORMS)
+
+    @staticmethod
+    def random_hw_concurrency():
+        return random.choice(StealthEngine.HW_CONCURRENCY)
+
+    @staticmethod
+    def random_device_memory():
+        return random.choice(StealthEngine.DEVICE_MEMORY)
+
+    @staticmethod
+    def random_resolution():
+        return random.choice(StealthEngine.SCREEN_RESOLUTIONS)
+
+    @staticmethod
+    def random_color_depth():
+        return random.choice(StealthEngine.COLOR_DEPTHS)
+
+    @staticmethod
+    def human_delay(min_sec=0.5, max_sec=2.0):
+        """Simulate human reaction delay between actions"""
+        time.sleep(random.uniform(min_sec, max_sec))
+
+    @staticmethod
+    def random_scroll_pause():
+        """Random short pause to simulate reading"""
+        time.sleep(random.uniform(0.3, 1.2))
+
+    @staticmethod
+    def jittered_sleep(base_sec=1.0, jitter=0.5):
+        """Sleep with randomized jitter to avoid pattern detection"""
+        time.sleep(base_sec + random.uniform(-jitter, jitter))
+
+# Inject stealth scripts at the CDP/browser level
+STEALTH_JS_AT_RUNTIME = r"""
+(function() {
+    // === PLUGINS SPOOFING ===
+    var plugins = [];
+    var pluginData = [
+        {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format'},
+        {name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: 'Portable Document Format'},
+        {name: 'Native Client', filename: 'internal-nacl-plugin', description: 'NaCl plugin'}
+    ];
+    for (var i = 0; i < pluginData.length; i++) {
+        var p = pluginData[i];
+        plugins.push({
+            name: p.name,
+            filename: p.filename,
+            description: p.description,
+            length: 1,
+            '__mimeTypes': [{
+                type: 'application/x-google-chrome-pdf' || 'application/pdf',
+                description: 'Portable Document Format',
+                suffixes: 'pdf'
+            }]
+        });
+    }
+    // Spoof navigator.plugins
+    try {
+        Object.defineProperty(navigator, 'plugins', {
+            get: function() { return plugins; },
+            configurable: false,
+            enumerable: false
+        });
+    } catch(e) {}
+
+    // === LANGUAGES SPOOFING ===
+    try {
+        Object.defineProperty(navigator, 'languages', {
+            get: function() { return ['en-US', 'en']; },
+            configurable: false,
+            enumerable: false
+        });
+    } catch(e) {}
+
+    // === PLATFORM SPOOFING ===
+    try {
+        Object.defineProperty(navigator, 'platform', {
+            get: function() { return 'Win32'; },
+            configurable: false,
+            enumerable: false
+        });
+    } catch(e) {}
+
+    // === HARDWARE CONCURRENCY SPOOFING ===
+    try {
+        Object.defineProperty(navigator, 'hardwareConcurrency', {
+            get: function() { return 8; },
+            configurable: false,
+            enumerable: false
+        });
+    } catch(e) {}
+
+    // === DEVICE MEMORY SPOOFING ===
+    try {
+        Object.defineProperty(navigator, 'deviceMemory', {
+            get: function() { return 8; },
+            configurable: false,
+            enumerable: false
+        });
+    } catch(e) {}
+
+    // === COLOR DEPTH ===
+    try {
+        Object.defineProperty(window.screen, 'colorDepth', {
+            get: function() { return 24; },
+            configurable: false,
+            enumerable: false
+        });
+    } catch(e) {}
+
+    // === WEBGL VENDOR/RENDERER SPOOFING ===
+    try {
+        var getParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function(parameter) {
+            if (parameter === 37445) return 'Intel Inc.';  // UNMASKED_VENDOR_WEBGL
+            if (parameter === 37446) return 'Intel Iris OpenGL Engine';  // UNMASKED_RENDERER_WEBGL
+            return getParameter.call(this, parameter);
+        };
+    } catch(e) {}
+
+    try {
+        var getParameter2 = WebGL2RenderingContext.prototype.getParameter;
+        WebGL2RenderingContext.prototype.getParameter = function(parameter) {
+            if (parameter === 37445) return 'Intel Inc.';
+            if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+            return getParameter2.call(this, parameter);
+        };
+    } catch(e) {}
+
+    // === CANVAS FINGERPRINT NOISE ===
+    try {
+        var originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+        HTMLCanvasElement.prototype.toDataURL = function(type) {
+            if (this.width === 0 && this.height === 0) {
+                return originalToDataURL.call(this, type);
+            }
+            var context = this.getContext('2d');
+            if (context) {
+                var imageData = context.getImageData(0, 0, this.width, this.height);
+                for (var i = 0; i < imageData.data.length; i += 4) {
+                    imageData.data[i] = imageData.data[i] ^ (Math.random() > 0.5 ? 1 : 0);
+                    imageData.data[i+1] = imageData.data[i+1] ^ (Math.random() > 0.5 ? 1 : 0);
+                    imageData.data[i+2] = imageData.data[i+2] ^ (Math.random() > 0.5 ? 1 : 0);
+                }
+                context.putImageData(imageData, 0, 0);
+            }
+            return originalToDataURL.call(this, type);
+        };
+    } catch(e) {}
+
+    // === NOTIFICATION PERMISSION SPOOFING ===
+    try {
+        Object.defineProperty(Notification, 'permission', {
+            get: function() { return 'default'; },
+            configurable: false
+        });
+    } catch(e) {}
+
+    // === CHROME RUNTIME SPOOFING ===
+    try {
+        window.chrome = {
+            runtime: {
+                connect: function() {},
+                sendMessage: function() {},
+                onMessage: { addListener: function() {}, removeListener: function() {} },
+                id: undefined
+            },
+            loadTimes: function() { return {}; },
+            csi: function() { return {}; },
+            app: { isInstalled: false, InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' }, getDetails: function() {}, runningState: function() { return 'cannot_run'; } },
+            webstore: { onInstallStageChanged: {}, onDownloadProgress: {} },
+            management: { get: function() {}, getAll: function() {}, getSelf: function() {} },
+            identity: { getAuthToken: function() {} },
+            history: { visit: function() {}, deleteUrl: function() {}, getVisits: function() {} },
+            cookies: { get: function() {}, getAll: function() {}, set: function() {}, remove: function() {}, getAllCookieStores: function() {} },
+            downloads: { download: function() {}, erase: function() {}, search: function() {} },
+            extension: { getURL: function() {}, getViews: function() {}, getBackgroundPage: function() {}, connect: function() {}, sendRequest: function() {}, onRequest: {}, onConnect: {} },
+            i18n: { getMessage: function() {}, getUILanguage: function() {}, getAcceptLanguages: function() {} },
+            permissions: { getAll: function() {}, contains: function() {}, request: function() {}, remove: function() {} }
+        };
+    } catch(e) {}
+
+    // === WINDOW OUTER DIMENSIONS (headless detection) ===
+    try {
+        Object.defineProperty(window, 'outerWidth', {
+            get: function() { return 1920; },
+            configurable: false
+        });
+        Object.defineProperty(window, 'outerHeight', {
+            get: function() { return 1080; },
+            configurable: false
+        });
+    } catch(e) {}
+
+    // === IFRAME CONTENTWINDOW DETECTION EVASION ===
+    try {
+        var originalContentWindow = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+        if (!originalContentWindow) {
+            Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+                get: function() {
+                    try { return this.contentWindow; } catch(e) { return null; }
+                },
+                configurable: true
+            });
+        }
+    } catch(e) {}
+
+    // === ERROR STACK TRACE CLEANUP ===
+    try {
+        var originalToString = Error.prototype.toString;
+        Error.prototype.toString = function() {
+            var str = originalToString.call(this);
+            str = str.replace(/at .*?\\n/g, function(match) {
+                if (match.includes('chrome-extension') || match.includes('puppeteer') || match.includes('selenium')) {
+                    return '';
+                }
+                return match;
+            });
+            return str;
+        };
+    } catch(e) {}
+
+    // === AUTOMATION CONTROLED FEATURE REMOVAL ===
+    try {
+        delete window.callPhantom;
+        delete window._phantom;
+    } catch(e) {}
+
+    // === PERMISSIONS ENUMERATION DETECTION EVASION ===
+    try {
+        var originalQuery = navigator.permissions.query;
+        navigator.permissions.query = function(params) {
+            return originalQuery.call(this, params).then(function(permission) {
+                if (permission.name === 'notifications') {
+                    permission.state = 'default';
+                }
+                if (permission.name === 'push') {
+                    permission.state = 'prompt';
+                }
+                return permission;
+            });
+        };
+    } catch(e) {}
+
+    // === MOUSE MOVEMENT SIMULATION (subtle, random) ===
+    document.addEventListener('DOMContentLoaded', function() {
+        var simulateMove = function() {
+            var el = document.elementFromPoint(
+                Math.floor(Math.random() * (window.innerWidth - 100)) + 50,
+                Math.floor(Math.random() * (window.innerHeight - 100)) + 50
+            );
+            if (el) {
+                var evt = new MouseEvent('mousemove', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: Math.random() * window.innerWidth,
+                    clientY: Math.random() * window.innerHeight
+                });
+                el.dispatchEvent(evt);
+            }
+        };
+        // Very subtle random movements
+        setInterval(simulateMove, randomInterval(45000, 120000));
+    });
+
+    function randomInterval(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+})();
+"""
+
+# Second-stage stealth patch (executed after page load)
+STEALTH_JS_POSTLOAD = r"""
+(function() {
+    // === PATCH ELEMENT COUNTING TECHNIQUES ===
+    try {
+        var origLength = Object.getOwnPropertyDescriptor(HTMLCollection.prototype, 'length');
+        // No change needed, just ensure it works normally
+    } catch(e) {}
+
+    // === CANVAS RENDERING CONTEXT SPOOFING ===
+    try {
+        var origGetContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function(contextType, contextAttributes) {
+            if (contextType === 'webgl' || contextType === 'experimental-webgl' || contextType === 'webgl2') {
+                var gl = origGetContext.call(this, contextType, contextAttributes);
+                if (gl) {
+                    var origGetExtension = gl.getExtension.bind(gl);
+                    gl.getExtension = function(name) {
+                        // Hide debugging extensions
+                        if (name === 'WEBGL_debug_renderer_info') {
+                            return null;
+                        }
+                        return origGetExtension(name);
+                    };
+                }
+                return gl;
+            }
+            return origGetContext.call(this, contextType, contextAttributes);
+        };
+    } catch(e) {}
+
+    // === BLOCK RESIZE OBSERVER (used to detect headless) ===
+    try {
+        var OrigResizeObserver = window.ResizeObserver;
+        if (OrigResizeObserver) {
+            window.ResizeObserver = function(callback) {
+                var observer = new OrigResizeObserver(function() {
+                    try { callback.apply(this, arguments); } catch(e) {}
+                });
+                observer.disconnect = OrigResizeObserver.prototype.disconnect;
+                observer.observe = OrigResizeObserver.prototype.observe;
+                observer.unobserve = OrigResizeObserver.prototype.unobserve;
+                return observer;
+            };
+            window.ResizeObserver.prototype = OrigResizeObserver.prototype;
+            Object.defineProperty(window.ResizeObserver, 'prototype', { value: OrigResizeObserver.prototype });
+        }
+    } catch(e) {}
+
+    // === INTERSECTION OBSERVER PATCHING ===
+    try {
+        var OrigIntersectionObserver = window.IntersectionObserver;
+        if (OrigIntersectionObserver) {
+            window.IntersectionObserver = function(callback, options) {
+                var wrappedCallback = function(entries) {
+                    for (var i = 0; i < entries.length; i++) {
+                        entries[i].isIntersecting = true;
+                        entries[i].intersectionRatio = Math.random() * 0.3 + 0.7;
+                    }
+                    callback(entries);
+                };
+                return new OrigIntersectionObserver(wrappedCallback, options);
+            };
+            window.IntersectionObserver.prototype = OrigIntersectionObserver.prototype;
+        }
+    } catch(e) {}
+
+    // === SMOOTH SCROLL SIMULATION ===
+    try {
+        var origScrollTo = window.scrollTo;
+        window.scrollTo = function(options) {
+            if (options && options.behavior === 'smooth') {
+                return origScrollTo.call(window, {
+                    top: options.top || 0,
+                    left: options.left || 0,
+                    behavior: 'auto'
+                });
+            }
+            return origScrollTo.apply(this, arguments);
+        };
+    } catch(e) {}
+
+    // === FULLSCREEN DETECTION EVASION ===
+    try {
+        Object.defineProperty(document, 'fullscreenElement', {
+            get: function() { return undefined; },
+            configurable: true
+        });
+    } catch(e) {}
+
+})();
+"""
+
+class AntiDetectionPatches:
+    """CDP-level anti-detection patches applied via Chrome DevTools Protocol"""
+
+    @staticmethod
+    def get_overrides(driver):
+        """Apply CDP-level overrides to mask automation signals"""
+        try:
+            driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+                'userAgent': StealthEngine.random_ua(),
+                'acceptLanguage': StealthEngine.random_lang(),
+                'platform': 'Win32',
+            })
+        except Exception:
+            pass
+
+        try:
+            driver.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {
+                'mobile': False,
+                'width': 1920,
+                'height': 1080,
+                'deviceScaleFactor': random.choice([1, 1.25, 1.5]),
+            })
+        except Exception:
+            pass
+
+        try:
+            driver.execute_cdp_cmd('Emulation.setTimezoneOverride', {
+                'timezoneId': random.choice([
+                    'America/New_York', 'America/Chicago', 'America/Los_Angeles',
+                    'Europe/London', 'Europe/Paris', 'Europe/Berlin',
+                    'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Seoul',
+                    'Australia/Sydney', 'America/Toronto',
+                ])
+            })
+        except Exception:
+            pass
+
+        try:
+            driver.execute_cdp_cmd('Emulation.overrideGeolocation', {
+                'latitude': random.uniform(30, 50),
+                'longitude': random.uniform(-130, -70),
+                'accuracy': random.uniform(10, 100),
+            })
+        except Exception:
+            pass
+
+        try:
+            driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': STEALTH_JS_AT_RUNTIME
+            })
+        except Exception:
+            pass
+
+        try:
+            driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {
+                'headers': {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Accept-Language': StealthEngine.random_lang(),
+                    'Sec-Ch-Ua': StealthEngine._build_sec_ch_ua(),
+                    'Sec-Ch-Ua-Mobile': '?0',
+                    'Sec-Ch-Ua-Platform': '"Windows"',
+                    'DNT': '1',
+                    'Upgrade-Insecure-Requests': '1',
+                }
+            })
+        except Exception:
+            pass
+
+    @staticmethod
+    def _build_sec_ch_ua():
+        """Build a realistic Sec-Ch-Ua header"""
+        versions = [
+            '"Chromium"; v="130", "Not?A_Brand"; v="8"',
+            '"Chromium"; v="129", "Not?A_Brand"; v="8"',
+            '"Chromium"; v="128", "Not?A_Brand"; v="8"',
+            '"Chromium"; v="127", "Not?A_Brand"; v="8"',
+            '"Chromium"; v="126", "Not?A_Brand"; v="8"',
+        ]
+        return random.choice(versions)
+
+def random_delay(min_sec, max_sec):
+    """Public helper for randomized delays between actions"""
+    time.sleep(random.uniform(min_sec, max_sec))
+
+def human_like_scroll(driver, page_height=None):
+    """Simulate human-like scroll behavior with variable speed and pauses"""
+    if driver is None:
+        return
+    try:
+        if page_height is None:
+            page_height = driver.execute_script("return document.body.scrollHeight")
+
+        viewport_height = driver.execute_script("return window.innerHeight")
+        current_pos = 0
+        scroll_speed = random.uniform(80, 200)
+
+        while current_pos < page_height - viewport_height:
+            chunk = random.randint(100, 400)
+            current_pos = min(current_pos + chunk, page_height - viewport_height)
+            driver.execute_script(f"window.scrollTo(0, {current_pos})")
+            time.sleep(random.uniform(0.02, 0.08))
+
+        time.sleep(random.uniform(0.5, 1.5))
+        driver.execute_script("window.scrollTo(0, 0)")
+    except Exception:
+        pass
 
 class RecipeCrawler:
     def __init__(self, full_run=False):
@@ -163,20 +718,94 @@ class RecipeCrawler:
         return should_shutdown
 
     def setup_driver(self):
-        """Initialize Selenium WebDriver with robust settings"""
+        """Initialize Selenium WebDriver with maximum anti-detection stealth"""
         options = webdriver.ChromeOptions()
+
+        # === HEADLESS MODE ===
         options.add_argument("--headless=new")
+
+        # === BASIC DISGUISE FLAGS ===
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
+
+        # === CRITICAL: Disable automation flags ===
         options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-plugins-discovery")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
-        # Add user agent to appear more like a real browser
-        options.add_argument(f"--user-agent={uagent}")
+
+        # === WINDOW SIZE (match common resolution) ===
+        res_w, res_h = StealthEngine.random_resolution()
+        dw = random.randint(320, 1600)
+        dh = random.randint(600, 900)
+        options.add_argument(f"--window-size={dw},{dh}")
+
+        # === LANGUAGE AND LOCALE ===
+        lang = StealthEngine.random_lang()
+        options.add_argument(f"--lang={lang}")
+
+        # === DISABLE NOTIFICATIONS & PERMISSIONS PROMPTS ===
+        options.add_argument("--disable-notifications")
+        options.add_argument("--disable-popup-blocking")
+        options.add_argument("--disable-default-apps")
+        options.add_argument("--disable-translate")
+
+        # === DISABLE EXTENSIONS & DISCOVERY ===
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-plugins-discovery")
+
+        # === USER DATA DIR (simulate persistent profile) ===
+        profile_dir = Path(os.getenv('TEMP', '/tmp')) / f"chrome_profile_{random.randint(10000, 99999)}"
+        options.add_argument(f"--user-data-dir={profile_dir}")
+
+        # === PREFETCH & NETWORK SETTINGS ===
+        options.add_argument("--dns-prefetch-disable")
+        options.add_argument("--force-color-profile=srgb")
+        options.add_argument("--enable-features=NetworkServiceInProcess")
+
+        # === PERFORMANCE FLAGS (avoid headless-specific flags) ===
+        options.add_argument("--disable-background-networking")
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--disable-breakpad")
+        options.add_argument("--disable-client-side-phishing-detection")
+        options.add_argument("--disable-component-update")
+        options.add_argument("--disable-default-apps")
+        options.add_argument("--disable-domain-reliability")
+        options.add_argument("--disable-features=TranslateUI,BlinkGenPropertyTrees")
+        options.add_argument("--disable-hang-monitor")
+        options.add_argument("--disable-ipc-flooding-protection")
+        options.add_argument("--disable-offer-store-unmasked-wallets")
+        options.add_argument("--disable-profiles-shortcut-manager")
+        options.add_argument("--disable-sync")
+        options.add_argument("--disable-signin-scoped-device-id")
+        options.add_argument("--metrics-recording-only")
+        options.add_argument("--mute-audio")
+        options.add_argument("--no-default-browser-check")
+        options.add_argument("--no-first-run")
+        options.add_argument("--password-store=basic")
+        options.add_argument("--use-mock-keychain")
+
+        # === USER AGENT (rotated per session) ===
+        ua = StealthEngine.random_ua()
+        options.add_argument(f"--user-agent={ua}")
+
+        # === ADDITIONAL METADATA SPOOFING via experimental options ===
+        options.add_experimental_option("prefs", {
+            "profile.managed_default_content_settings.images": 1,
+            "profile.managed_default_content_settings.javascript": 1,
+            "profile.managed_default_content_settings.cookies": 1,
+            "profile.managed_default_content_settings.popups": 0,
+            "profile.managed_default_content_settings.geolocation": 1,
+            "profile.managed_default_content_settings.notifications": 1,
+            "profile.password_manager_enabled": False,
+            "credentials_enable_service": False,
+            "intl.accept_languages": StealthEngine.random_lang().split(',')[0],
+            "safebrowsing.enabled": True,
+            "safebrowsing.malware_reporting.permissioned": False,
+        })
+
         try:
             from webdriver_manager.chrome import ChromeDriverManager
             from selenium.webdriver.chrome.service import Service
@@ -191,27 +820,59 @@ class RecipeCrawler:
                 print("Please ensure Chrome browser is installed.")
                 sys.exit(1)
 
-        # Execute script to hide webdriver detection
+        # ============================================
+        # CDP-LEVEL ANTI-DETECTION PATCHES
+        # ============================================
+        try:
+            AntiDetectionPatches.get_overrides(self.driver)
+        except Exception:
+            pass
+
+        # === SECOND-STAGE JS PATCHES (execute after page context is ready) ===
+        self._apply_stealth_patches()
+
+        # === LEGACY WEBDRIVER PROPERTY HIDING (defense in depth) ===
         self.driver.execute_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
+
         # Set page load timeout
         self.driver.set_page_load_timeout(self.page_load_timeout)
-        # Set implicit wait
-        self.driver.implicitly_wait(5)
 
-    def stripClean(self, text):
-        cleaned = text.replace(" ", "_")
-        cleaned = cleaned.replace("____", "_")
-        cleaned = cleaned.replace("___", "_")
-        cleaned = cleaned.replace("__", "_")
+        # Set implicit wait (reduced to avoid suspicion)
+        self.driver.implicitly_wait(3)
+
+    def _apply_stealth_patches(self):
+        """Apply stealth JS patches via CDP for every new document"""
+        try:
+            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': STEALTH_JS_AT_RUNTIME
+            })
+        except Exception:
+            self.driver.execute_script(STEALTH_JS_AT_RUNTIME)
+
+    def _postload_stealth(self):
+        """Apply post-load stealth patches after page is interactive"""
+        try:
+            self.driver.execute_script(STEALTH_JS_POSTLOAD)
+        except Exception:
+            pass
+
+    def stripClean(self, text: str) -> str:
+        if not text:
+            return ""
+
+        cleaned = re.sub(r'[^\x00-\x7F]+', '', text)
+
+        cleaned = re.sub(
+            r"\s*\(Video Recipe\)\s*|\s*VIDEO\s*", " ", cleaned, flags=re.IGNORECASE
+        )
+        cleaned = cleaned.replace(" ", "_")
+        cleaned = re.sub(r"_+", "_", cleaned)
         cleaned = cleaned.replace("%", "--PCENT--")
         cleaned = cleaned.replace("&", "--AND--")
-        cleaned = re.sub(r"[()]", "", cleaned)
-        cleaned = re.sub(r'[“”,!’\'"<>:/\\|?*]', "", cleaned)
-        cleaned = cleaned.strip("_\n")
-        cleaned = cleaned.strip("_")
-        cleaned = cleaned.strip()
+        cleaned = re.sub(r'[()“”’!\',"<>:/\\|?*\[\]]', "", cleaned)
+        cleaned = cleaned.strip("_ \n")
         return cleaned
 
     def load_progress(self):
@@ -303,6 +964,9 @@ class RecipeCrawler:
         skipped_count = 0
 
         for json_file in json_files:
+
+            print(f"Importing: {json_file}")
+
             # Skip files in subdirectories (resume, images, thumbs, db)
             if json_file.parent != DATA_DIR:
                 continue
@@ -327,7 +991,7 @@ class RecipeCrawler:
                     "INSERT INTO recipes (name, data, added_at) VALUES (?, ?, ?)",
                     (name, json.dumps(recipe_data), datetime.now().isoformat()),
                 )
-                print(f"Imported: {name}")
+                #print(f"Imported: {name}")
                 imported_count += 1
 
             except Exception as e:
@@ -650,7 +1314,14 @@ class RecipeCrawler:
             adapter = HTTPAdapter(max_retries=retry_strategy)
             session.mount("http://", adapter)
             session.mount("https://", adapter)
-            headers = {"User-Agent": f"{uagent}"}
+            # Use rotated user-agent for image downloads too
+            image_ua = StealthEngine.random_ua()
+            headers = {
+                "User-Agent": image_ua,
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Accept-Language": StealthEngine.random_lang(),
+                "Referer": BASE_URL,
+            }
             response = session.get(image_url, headers=headers, timeout=30, stream=True)
             response.raise_for_status()
 
@@ -675,7 +1346,7 @@ class RecipeCrawler:
                     return None
 
                 # Convert to webp and resize to 785x301 for main image
-                img = img.convert("RGB")  # Ensure RGB mode for webp
+                img = img.convert("RGB")
                 # Use LANCZOS resampling (best quality for downscaling)
                 resample = (
                     PILImage.Resampling.LANCZOS
@@ -827,6 +1498,18 @@ class RecipeCrawler:
             print(f"  Database error adding recipe: {e}")
             return False
 
+    def recipe_exists_in_database(self, name):
+        """Check if a recipe already exists in the database by name"""
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM recipes WHERE name = ?", (name,))
+            exists = cursor.fetchone() is not None
+            conn.close()
+            return exists
+        except sqlite3.Error:
+            return False
+
     def save_recipe(self, recipe_data, page_url):
         """Save recipe to JSON file"""
         recipe_name = recipe_data.get("name")
@@ -839,8 +1522,13 @@ class RecipeCrawler:
 
         display_name = self._clean_html_entities(recipe_name)
 
+        # Check if recipe already exists in database by name
+        if self.recipe_exists_in_database(recipe_name):
+            print(f"Skipping already collected: {recipe_name}")
+            return False
+
         if page_url in self.collected_recipes:
-            print(f"Skipping already collected: {display_name}")
+            print(f"Skipping already collected URL: {page_url}")
             return False
 
         safe_name = self.clean_filename(recipe_name)
@@ -950,7 +1638,7 @@ class RecipeCrawler:
 
     def updateCrawl(self):
         print("=" * 60)
-        print(f"{appname} {verstr}")
+        print(f"{appname} v{verstr}")
         print("=" * 60)
         if self.full_run:
             print("Mode: Full Run")
@@ -964,7 +1652,7 @@ class RecipeCrawler:
         return
 
     def crawl_page(self, url):
-        """Crawl a single page with robust error handling"""
+        """Crawl a single page with robust error handling and stealth behavior"""
         if not self.running:
             return []
 
@@ -982,10 +1670,14 @@ class RecipeCrawler:
         print(f"\nCrawling: {url}")
         self.visited_urls.add(url)
 
+        # Random delay before navigating (human-like hesitation)
+        StealthEngine.human_delay(0.8, 2.5)
+
         for attempt in range(self.max_retries + 1):
             try:
                 if attempt > 0:
                     print(f"  Retry attempt {attempt}/{self.max_retries}")
+                    StealthEngine.jittered_sleep(3, 1.5)
 
                 # Navigate to URL with timeout handling
                 try:
@@ -993,7 +1685,7 @@ class RecipeCrawler:
                 except Exception as e:
                     if attempt < self.max_retries:
                         print(f"  Page load failed: {e}, retrying...")
-                        time.sleep(3)
+                        StealthEngine.jittered_sleep(4, 2.0)
                         continue
                     else:
                         print(
@@ -1006,6 +1698,15 @@ class RecipeCrawler:
                 if not self.wait_for_page_load(url):
                     if attempt < self.max_retries:
                         continue
+
+                # Apply post-load stealth patches
+                self._postload_stealth()
+
+                # Simulate human scrolling behavior before extracting data
+                human_like_scroll(self.driver)
+
+                # Random pause (simulating reading time)
+                StealthEngine.random_scroll_pause()
 
                 # Debug: Print page title
                 try:
@@ -1049,19 +1750,19 @@ class RecipeCrawler:
                     return []
                 if attempt >= self.max_retries:
                     return []
-                time.sleep(3)
+                StealthEngine.jittered_sleep(4, 2.0)
             except Exception as e:
                 print(f"Unexpected error crawling {url}: {e}")
                 if attempt >= self.max_retries:
                     return []
-                time.sleep(3)
+                StealthEngine.jittered_sleep(4, 2.0)
 
         return []
 
     def start_crawl(self):
         os.system("cls" if os.name == "nt" else "clear")
         print("=" * 60)
-        print(f"{appname} {verstr}")
+        print(f"{appname} v{verstr}")
         print("=" * 60)
         if self.full_run:
             print("Mode: Full Run")
@@ -1135,10 +1836,11 @@ class RecipeCrawler:
                         self.crawl_queue.append(link)
 
                 print(f"Queue size: {len(self.crawl_queue)} | Visited: {len(self.visited_urls)} | Collected: {self.clean_collected()}")
-                time.sleep(1)
+                # Randomize inter-page delay to avoid timing pattern detection
+                StealthEngine.jittered_sleep(2.0, 1.5)
 
         except KeyboardInterrupt:
-            print("\nShutdown requested. Saving progress...")
+                print("\nShutdown requested. Saving progress...")
         finally:
             self.save_progress()
             self.shutdown()

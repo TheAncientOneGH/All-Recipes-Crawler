@@ -1,4 +1,4 @@
-# AllRecipes Crawler v1.0
+# AllRecipes Crawler v1.1
 
 A Python script using Selenium to crawl [www.allrecipes.com](https://www.allrecipes.com) and extract recipe data.
 
@@ -76,7 +76,6 @@ AllRecipes/
 ├── AllRecViewer.cmd            # Quick start viewer batch command
 ├── LICENSE.md                  # License Information
 ├── README.md                   # This file
-├── error.log                   # Errors get written here (at least most of them - Automatically Created)
 ├── arc.lock                    # Prevent running multiple instance crawler (Automatically Created)
 └── arv.lock                    # Prevent running multiple instance viewer (Automatically Created)
 ```
